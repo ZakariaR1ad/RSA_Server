@@ -1,8 +1,9 @@
+import imp
 import socket
 import random
 from Crypto.Util.number import *
 from Crypto.PublicKey import RSA
-
+from RC4 import RC4
 
 class RSA_System:
     def __init__(self,e,N,d):
@@ -12,9 +13,10 @@ class RSA_System:
     def encrypt(self,msg):
         pt = bytes_to_long(msg)
         ct = pow(pt,self.e,self.N)
-        return long_to_bytes(ct)
+        return hex(ct)
     def decrypt(self,cipher):
-        ct = bytes_to_long(cipher)
+
+        ct = int(cipher,16) #pour preserver la bijectivité du cryptosystème lors de la lecture depuis la console
         pt = pow(ct,self.d,self.N)
         return long_to_bytes(pt)
 
@@ -28,7 +30,6 @@ def generateKeys():
             return (e,p*q,d)
 def exportPublicKey(N,e):
     key = RSA.construct((N,e))
-    print(key.exportKey())
     f = open(r"Pubkey.pem","wb")
 
     f.write(key.exportKey())
@@ -40,6 +41,7 @@ def Menu():
     e,N,d = generateKeys()
     rsa = RSA_System(e,N,d)
     exportPublicKey(N,e)
+    
     print("Choose a mode: ")
     print("1....Server Mode")
     print("2....Local Mode")
@@ -71,36 +73,60 @@ def LocalMenu():
 def LocalMode(rsa):
     while(True):
         choice = LocalMenu()
-        match(choice):
-            case 1:
-                msg = input("enter your plaintext > ").encode()
-                ct = rsa.encrypt(msg)
-                print(f"here is your ciphertext: {ct}")
-            case 2:
-                cipher = input("enter your ciphertext > ").encode()
-                pt = rsa.decrypt(cipher)
-                print(f"here is your plaintext: {pt}")
-            case 3:
-                print("GoodBye....!!!")
-                break
+        try: 
+            match(choice):
+                case 1:
+                
+                    msg = input("enter your plaintext > ").encode()
+                    ct = rsa.encrypt(msg)
+                    print(f"here is your ciphertext: {ct}")
+                case 2:
+                    cipher = input("enter your ciphertext > ").encode()
+                    pt = rsa.decrypt(cipher)
+                    print(f"here is your plaintext: {pt}")
+                case 3:
+                    print("GoodBye....!!!")
+                    break
+        except:
+            raise Exception("something went wrong!!!!")
 
 
 
 
 #Partie 3 du tp
 def ServerMode(rsa):
+    print("Generating RC4 ....")
+    rc4 = RC4()
+    print("Waiting for connection....")
     HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
     PORT = 1337  # Port to listen on (non-privileged ports are > 1023)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((HOST, PORT))
         s.listen()
+
         conn, addr = s.accept()
         with conn:
-            print(f"Connected by {addr}")
+            print(f"Connected to {addr}")
             while True:
+                print("sending the public key")
+                f = open("PubKey.pem","rb")
+                pub= RSA.importKey(f.read())
+                #envoie de la clé public RSA
+                
+                conn.send(pub.exportKey())
+
+                #receiving the encrypted message
+                print("Receiving the RSA encrypted Msg")
 
                 data = conn.recv(1024)
+                
+                # decrypting the data (RSA)
+                rsa_decr_data = rsa.decrypt(data)
+
+                # Encrypting the Data RC4
+                encrypted_data = rc4.encrypt(rsa_decr_data)
+                conn.send(encrypted_data)
                 if not data:
                     break
                 conn.sendall(data)
@@ -109,10 +135,10 @@ def Main():
     choice,rsa = Menu()
     match(choice):
         case 1:
-            print("coming soon")
+            # print("coming soon")
+            ServerMode(rsa)
         case 2:
             LocalMode(rsa)
-
 
 
     
