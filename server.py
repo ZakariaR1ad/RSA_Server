@@ -1,4 +1,4 @@
-import imp
+
 import socket
 import random
 from Crypto.Util.number import *
