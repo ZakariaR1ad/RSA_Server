@@ -3,10 +3,10 @@ from Crypto.Util.number import *
 
 
 class RC4:
-    def __init__(self):
+    def __init__(self,Key =random.randbytes(256)):
         #Generation d'une clé aléatoire
 
-        self.Key = random.randbytes(256)
+        self.Key = Key
 
     def encrypt(self,M):
         # initialisation
@@ -28,9 +28,10 @@ class RC4:
             t = (S[i]+S[j])%256
             k = S[t]
             ct += long_to_bytes(k^M[m])
-        return ct
+        return hex(bytes_to_long(ct))
 
-    def decrypt(self,ct):
+    def decrypt(self,c):
+        ct = long_to_bytes(int(c,16))
         # initialisation
         S = [int(i) for i in range(256)]
         T = [i for i in self.Key]
