@@ -6,16 +6,18 @@ from Crypto.PublicKey import RSA
 from RC4 import RC4
 
 class RSA_System:
+
     def __init__(self,e,N,d):
         self.e = e
         self.N = N
         self.d = d
+
     def encrypt(self,msg):
         pt = bytes_to_long(msg)
         ct = pow(pt,self.e,self.N)
         return hex(ct)
-    def decrypt(self,cipher):
 
+    def decrypt(self,cipher):
         ct = int(cipher,16) #pour preserver la bijectivité du cryptosystème lors de la lecture depuis la console
         pt = pow(ct,self.d,self.N)
         return long_to_bytes(pt)
@@ -96,7 +98,6 @@ def LocalMode(rsa):
 #Partie 3 du tp
 def ServerMode(rsa):
     print("Generating RC4 ....")
-    rc4 = RC4()
     print("Waiting for connection....")
     HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
     PORT = 1337  # Port to listen on (non-privileged ports are > 1023)
@@ -109,33 +110,44 @@ def ServerMode(rsa):
         with conn:
             print(f"Connected to {addr}")
             while True:
-                print("sending the public key")
+                #Echange de clés
+                print("Key exchange....")
                 f = open("PubKey.pem","rb")
-                pub= RSA.importKey(f.read())
-                #envoie de la clé public RSA
-                
-                conn.send(pub.exportKey())
+                pubServer= RSA.importKey(f.read())
+                conn.send(pubServer.exportKey())
 
-                #receiving the encrypted message
-                print("Receiving the RSA encrypted Msg")
+                pubClient = conn.recv(1024)
+                pubClient = RSA.importKey(pubClient)
 
-                data = conn.recv(1024)
-                
-                # decrypting the data (RSA)
-                rsa_decr_data = rsa.decrypt(data)
+                #Génération d'une clé privé pour RC4
+                RC4KEY = random.randbytes(256)
+                rc4 = RC4(RC4KEY)
 
-                # Encrypting the Data RC4
-                encrypted_data = rc4.encrypt(rsa_decr_data)
-                conn.send(encrypted_data)
-                if not data:
-                    break
-                conn.sendall(data)
-    
+                #envoie de cette clé
+                conn.send(long_to_bytes(pow(bytes_to_long(RC4KEY),pubClient.e,pubClient.n)))
+
+
+
+                while(True):
+                    #Receive the client response
+                    choice = conn.recv(1024)
+                    match(choice):
+                        case b"1":
+                            encrypted_msg = conn.recv(1024)
+                            print(f"received : {rc4.decrypt(encrypted_msg)}")
+                        case b"2":
+                            msg = rc4.encrypt(b"Hello there, you still here...")
+                            conn.send(msg.encode())
+                        case b"3":
+                            print("Client is gone....")
+                            break
+
+
+
 def Main():
     choice,rsa = Menu()
     match(choice):
         case 1:
-            # print("coming soon")
             ServerMode(rsa)
         case 2:
             LocalMode(rsa)
