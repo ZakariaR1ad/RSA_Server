@@ -1,8 +1,7 @@
-import imp
+
 import socket
 from Crypto.PublicKey import RSA
 from Crypto.Util.number import *
-from matplotlib.pyplot import pause
 from RC4 import RC4
 from binascii import *
 
